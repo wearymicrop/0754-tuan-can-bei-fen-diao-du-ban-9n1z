@@ -32,6 +32,9 @@ def sign(ledger, ident, body):
         raise DomainError("REVIEWER_REQUIRED", "请输入签收人")
     if previous["manifest"]["digest"] != body.get("digest"):
         raise DomainError("STALE_DIGEST", "摘要已变化，请重新打开凭证", 409)
+    amendment = ledger.amendment_of(ident)
+    if amendment is not None and not amendment["handover"]["ready"]:
+        raise DomainError("HANDOVER_BLOCKED", "补录结论未通过对账核对，不能交付接班", 409)
     receipt = {"reviewer": body["reviewer"].strip(), "digest": body["digest"],
                "id": ident, "balance": previous["result"]["reconcile"]["status"]}
     return ledger.sign(ident, receipt)

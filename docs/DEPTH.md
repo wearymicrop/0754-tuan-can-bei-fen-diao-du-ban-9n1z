@@ -15,6 +15,11 @@
 | M5 备用递补 | 展开每次实发车辆、批号与替代证据 | `GET /api/allocation/{sample}` | `app/modules/m5_allocation/dispatch.py` | `tests/test_allocation.py` |
 | M6 份数对账 | 复核订单、库存和车载三账 | `GET /api/reconcile/{sample}` | `app/modules/m6_reconcile/totals.py` | `tests/test_reconcile.py` |
 | M7 交接签单 | 冻结输入、重跑、签单和下载 | `POST /api/runs` | `app/modules/m7_archive/service.py` | `tests/test_archive.py` |
+| M8 补录裁决 | 登记换餐、晚到、备用退回，裁决形成可交接的新结论 | `POST /api/runs/{id}/amendments` | `app/modules/m8_amendments/service.py` | `tests/test_amendments.py` |
+
+## 补录裁决
+
+签单后的同批次补录（换餐改签、车辆晚到、备用退回）按补录单号登记。每条操作独立裁决：采用即并入原签单冻结输入（批次、截点、规则版本不变，即同一份库存与对账口径），退回则记录原因。采用的操作重跑全流程，备用递补与对账随之重算，生成按内容寻址的新签单；记录新旧签单的替换关系与订单、车辆、批号、缺餐、备用余量的前后对照。只有新旧结论都对平且补录全数采用，才允许签收交付接班。同一补录单号重传或中断重试返回原结论，不重复生成签单、不重复扣减备用餐；单号被不同内容占用则拒绝。
 
 ## 陷阱登记
 
@@ -31,3 +36,6 @@
 | TRAP-23 | 到站时恰好窗口关闭 | 本车错误占量 | 半开窗口 | `app/modules/m4_capacity/service.py` | `tests/test_windows.py::test_arrival_at_cutoff_is_not_on_time` |
 | TRAP-25 | 同站同波次两条有效窗 | 任取其一并发餐 | 两条都隔离，订单转争议 | `app/modules/m3_windows/service.py` | `tests/test_windows.py::test_multiple_windows_same_wave_quarantine_orders` |
 | TRAP-26 | 交接签单持旧摘要 | 签到错误快照 | 返回摘要冲突 | `app/modules/m7_archive/service.py` | `tests/test_archive.py::test_signature_requires_current_digest` |
+| TRAP-27 | 同一补录重传或断点重试 | 重复生成结论、备用重复扣减 | 补录单号幂等，结论按内容寻址 | `app/modules/m8_amendments/service.py` | `tests/test_amendments.py::test_idempotent_replay_no_duplicate_conclusion` |
+| TRAP-28 | 退回批号被隔离或已过期 | 退回入账污染库存账 | 该条补录退回并说明，其余照常裁决 | `app/modules/m8_amendments/ops.py` | `tests/test_amendments.py::test_operation_adjudication_rules` |
+| TRAP-29 | 补录结论未对平就签收 | 交接责任断链 | 新旧对账未齐拦截签收 | `app/modules/m7_archive/service.py` | `tests/test_amendments.py::test_sign_blocked_until_handover_ready` |
